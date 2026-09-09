@@ -56,5 +56,11 @@
     "type": "list",
     "default": [],
     "hint": "优先于全部和指定列表；填写用户 Open ID（ou_ 开头）。"
+  },
+  "auto_topic_title": {
+    "description": "自动总结话题标题",
+    "type": "bool",
+    "default": false,
+    "hint": "话题已有问答后，后台调用当前会话配置的模型生成简短标题。每个话题成功生成一次，额外消耗少量模型额度；不压缩历史、不向聊天发送总结。"
   }
 }

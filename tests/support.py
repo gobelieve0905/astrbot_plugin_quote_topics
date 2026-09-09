@@ -89,13 +89,16 @@ class Manager:
     async def new_conversation(self, umo, platform_id=None, persona_id=None, title=None):
         cid = f"topic-{len(self.conversations)}"
         self.conversations[cid] = types.SimpleNamespace(
-            cid=cid, user_id=umo, persona_id=persona_id, history="[]"
+            cid=cid, user_id=umo, persona_id=persona_id, history="[]", title=title
         )
         self.session_conversations[umo] = cid
         return cid
 
     async def get_conversation(self, umo, cid):
         return self.conversations.get(cid)
+
+    async def update_conversation(self, umo, conversation_id=None, title=None):
+        self.conversations[conversation_id].title = title
 
 
 def runtime(data_dir):

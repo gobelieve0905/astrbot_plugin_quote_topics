@@ -134,8 +134,25 @@ async def main():
         four = await turn(evt)
         assert four.conversation.cid == one.conversation.cid
         assert len(four.contexts) == 4
+        # Run the optional title path with real persisted history and manager APIs.
+        from unittest.mock import AsyncMock
+
+        plugin.config["auto_topic_title"] = True
+        provider = types.SimpleNamespace(
+            text_chat=AsyncMock(return_value=types.SimpleNamespace(completion_text="群聊话题测试"))
+        )
+        plugin.context.get_using_provider_async = AsyncMock(return_value=provider)
+        five = await turn(event("q5", "q1"))
+        if plugin.titles.tasks:
+            await asyncio.gather(*list(plugin.titles.tasks.values()))
+        saved = await manager.get_conversation(five.conversation.user_id, five.conversation.cid)
+        assert saved.title == "群聊话题测试"
+        assert len(json.loads(saved.history)) == 8
+        other = await manager.get_conversation(two.conversation.user_id, two.conversation.cid)
+        assert other.title == "引用话题 q2"
+        provider.text_chat.assert_awaited_once()
         print(
-            "PASS: real AstrBot 4.28.0 + Lark SDK + SQLite; new/resume/shared/restart; no network"
+            "PASS: real AstrBot 4.28.0 + Lark SDK + SQLite; new/resume/shared/restart/auto-title; no network"
         )
     finally:
         await plugin.terminate()

@@ -12,6 +12,7 @@ from astrbot.api.star import Context, Star, StarTools
 from .lark_resolver import resolve
 from .routing import CannotRestore, enabled, quote_id, scope_of
 from .store import Index, Topic
+from .titles import Titles
 
 KEY = "quote_topics.binding.v1"
 
@@ -25,6 +26,7 @@ class QuoteTopics(Star):
         self.cleanups = set()
         self.active = set()
         self.closed = False
+        self.titles = Titles(context, config)
 
     async def refuse(self, event, message):
         # AstrBot catches hook exceptions; stop FIRST so failures cannot fall
@@ -60,6 +62,10 @@ class QuoteTopics(Star):
             entry[1] -= 1
             if entry[1] == 0:
                 self.locks.pop(binding["scope"], None)
+
+        if not self.closed and not task.cancelled() and task.exception() is None:
+            if enabled(self.config, event):
+                self.titles.schedule(binding["topic"], binding["umo"])
 
     @filter.on_waiting_llm_request(priority=10000)
     async def waiting(self, event: AstrMessageEvent):
@@ -191,4 +197,5 @@ class QuoteTopics(Star):
         await asyncio.sleep(0)  # allow owner done callbacks to enqueue cleanup
         if self.cleanups:
             await asyncio.gather(*list(self.cleanups), return_exceptions=True)
+        await self.titles.close()
         self.index.close()
