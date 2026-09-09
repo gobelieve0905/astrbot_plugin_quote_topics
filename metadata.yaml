@@ -1,0 +1,9 @@
+name: astrbot_plugin_quote_topics
+display_name: 引用续聊
+desc: 引用消息接续原话题，不引用开启新话题。支持飞书群聊共享、私聊隔离和重启恢复，无需飞书 Agent 卡片插件。首版限 AstrBot 4.28.0 内置 Agent；未缓存的机器人回复恢复需要读取消息权限。
+version: 0.1.0
+author: gobelieve
+repo: https://github.com/gobelieve0905/astrbot_plugin_quote_topics
+astrbot_version: '>=4.28.0,<4.28.1'
+support_platforms:
+  - lark
