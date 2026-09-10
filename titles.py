@@ -29,7 +29,7 @@ class Titles:
     async def run(self, topic, umo):
         try:
             async with self.slots:
-                async with asyncio.timeout(45):
+                async with asyncio.timeout(300):
                     await self.generate(topic, umo)
         except Exception as exc:
             # Provider exceptions may contain credentials or conversation text.
@@ -89,6 +89,7 @@ class Titles:
             return
         title = (response.completion_text or "").strip().strip("\"'“”")
         if not title or "<None>" in title or len(title) > 48 or "\n" in title:
+            logger.info("Quote topics title skipped: empty or invalid model output")
             return
         title = title[:24]
         # Fetch again after the slow request: respect deletion/manual rename.
@@ -100,6 +101,13 @@ class Titles:
             and current.title == original
         ):
             await manager.update_conversation(topic.owner, conversation_id=topic.cid, title=title)
+            logger.info("Quote topics title saved")
+
+    def request_timeout(self):
+        try:
+            return max(20, min(240, int(self.config.get("auto_topic_title_timeout", 120))))
+        except (TypeError, ValueError):
+            return 120
 
     async def complete(self, umo, kwargs):
         primary = await self.context.get_using_provider_async(umo=umo)
@@ -123,7 +131,7 @@ class Titles:
                 return None
             try:
                 # A slow primary must leave time for the configured backup.
-                async with asyncio.timeout(20):
+                async with asyncio.timeout(self.request_timeout()):
                     response = await candidate.text_chat(**kwargs)
                 if response is None or getattr(response, "role", "assistant") == "err":
                     raise ValueError("Title provider returned no successful response")

@@ -157,3 +157,9 @@ class TitleTests(unittest.IsolatedAsyncioTestCase):
         await self.drain()
         self.assertEqual(self.conv.title, "引用话题 q1")
         backup.text_chat.assert_awaited_once()
+
+    async def test_timeout_budget_for_reasoning_models(self):
+        self.assertEqual(self.plugin.titles.request_timeout(), 120)
+        for value, expected in [(1, 20), (999, 240), (180, 180), ("bad", 120)]:
+            self.plugin.config["auto_topic_title_timeout"] = value
+            self.assertEqual(self.plugin.titles.request_timeout(), expected)
