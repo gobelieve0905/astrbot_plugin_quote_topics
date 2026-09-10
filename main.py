@@ -184,8 +184,8 @@ class QuoteTopics(Star):
         state = "已启用" if enabled(self.config, event) else "未启用"
         yield event.plain_result(
             f"引用续聊：本会话{state}。\n"
-            "规则：引用续聊，不引用新开。首版支持 AstrBot 4.28.0 的飞书内置 Agent。\n"
-            "无需卡片插件；恢复未缓存的机器人回复需要飞书读取消息权限。"
+            "规则：引用续聊，不引用新开。支持 AstrBot 4.28.0 的飞书内置 Agent。\n"
+            "恢复机器人回复所属话题需要飞书读取消息权限。"
         )
 
     async def terminate(self):
