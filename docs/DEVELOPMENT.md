@@ -22,3 +22,5 @@ python -B tests/integration_offline.py
 - [功能验收清单](ACCEPTANCE.md)
 
 发布安装包可使用 `git archive`；`.gitattributes` 会排除开发资料和测试文件。
+
+- [发布维护说明](RELEASING.md)

@@ -3,7 +3,7 @@
     "description": "总开关",
     "type": "bool",
     "default": false,
-    "hint": "开启后：引用续聊，不引用新开。仅支持飞书和 AstrBot 4.28.0 内置 Agent。"
+    "hint": "仅支持 AstrBot 4.28.0 飞书内置 Agent。开启后还需开启群聊或私聊并选择范围；不引用新开话题，引用续聊。"
   },
   "platform_ids": {
     "description": "平台实例范围",
@@ -14,7 +14,8 @@
   "enable_group": {
     "description": "群聊开关",
     "type": "bool",
-    "default": false
+    "default": false,
+    "hint": "开启后选择全部群聊，或填写指定群聊列表；列表为空且全部关闭时不生效。"
   },
   "group_all": {
     "description": "启用全部群聊",
@@ -37,7 +38,8 @@
   "enable_private": {
     "description": "私聊开关",
     "type": "bool",
-    "default": false
+    "default": false,
+    "hint": "开启后选择全部私聊，或填写指定用户列表；私聊仅恢复当前用户自己的话题。"
   },
   "private_all": {
     "description": "启用全部私聊",
@@ -61,7 +63,7 @@
     "description": "自动总结话题标题",
     "type": "bool",
     "default": false,
-    "hint": "话题已有问答后，后台调用当前会话配置的模型生成简短标题。每个话题成功生成一次，额外消耗少量模型额度；不压缩历史、不向聊天发送总结。"
+    "hint": "仅对已启用范围的话题生效。问答后后台生成一次标题，额外消耗模型额度；旧编号话题下次续聊时重试。刷新对话列表查看，不压缩历史或发送总结。"
   },
   "auto_topic_title_timeout": {
     "description": "标题模型等待时间（秒）",

@@ -1,6 +1,7 @@
 name: astrbot_plugin_quote_topics
 display_name: 引用续聊
-desc: 飞书引用续聊：引用消息继续原话题，不引用开启新话题，支持群聊共享、私聊隔离和自动话题标题。
+short_desc: 飞书话题管理（仅 AstrBot 4.28.0）
+desc: 仅支持 AstrBot 4.28.0 飞书内置 Agent。引用消息继续原话题，不引用开启新话题，支持群聊共享、私聊隔离和自动标题。默认关闭，安装后需配置启用范围；卡片按钮续聊需交互插件接入约定。
 version: 0.3.0
 author: gobelieve
 category: 工具
