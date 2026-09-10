@@ -60,3 +60,35 @@ def quote_id(event) -> str | None:
     if any(c.__class__.__name__ == "Reply" for c in event.get_messages()):
         raise CannotRestore("引用缺少消息编号，无法恢复话题。")
     return None
+
+
+CONTINUATION_KEY = "conversation_continuation_v1"
+_ABSENT = object()
+
+
+def continuation(event):
+    """Only trusted producer-supplied extras can request interaction routing."""
+    value = event.get_extra(CONTINUATION_KEY, _ABSENT)
+    if value is _ABSENT:
+        return None
+    if not isinstance(value, dict):
+        raise CannotRestore("卡片续聊元数据必须是结构化对象。")
+    if type(value.get("version")) is not int or value["version"] != 1:
+        raise CannotRestore("不支持的卡片续聊协议版本。")
+    if value.get("source") != "card_interaction":
+        raise CannotRestore("不支持的续聊来源。")
+    for name in ("event_id", "origin_message_id"):
+        ident = value.get(name)
+        if (
+            not isinstance(ident, str)
+            or not ident.strip()
+            or ident != ident.strip()
+            or len(ident) > 512
+            or any(ord(char) < 32 for char in ident)
+        ):
+            raise CannotRestore("卡片续聊编号字段缺失或格式错误。")
+    actor = event.get_sender_id()
+    if not isinstance(actor, str) or not actor.strip():
+        raise CannotRestore("交互事件缺少实际操作人身份。")
+    # Snapshot the contract before waiting; do not retain a mutable producer dict.
+    return value["event_id"], value["origin_message_id"], actor

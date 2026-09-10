@@ -60,8 +60,8 @@ class Event:
     def get_messages(self):
         return self.components
 
-    def get_extra(self, key):
-        return self.extras.get(key)
+    def get_extra(self, key=None, default=None):
+        return self.extras if key is None else self.extras.get(key, default)
 
     def set_extra(self, key, value):
         self.extras[key] = value
@@ -113,9 +113,17 @@ def runtime(data_dir):
     events.filter = types.SimpleNamespace(
         **{
             name: lambda *a, **kw: lambda f: f
-            for name in ["on_waiting_llm_request", "on_llm_request", "command"]
+            for name in [
+                "on_waiting_llm_request",
+                "on_llm_request",
+                "command",
+                "event_message_type",
+                "custom_filter",
+            ]
         }
     )
+    events.filter.CustomFilter = object
+    events.filter.EventMessageType = types.SimpleNamespace(ALL=object())
     star = types.ModuleType("astrbot.api.star")
 
     class Star:

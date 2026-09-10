@@ -17,7 +17,7 @@
 
 当前锁覆盖标准内置 Agent 请求，不覆盖核心管理指令、绕过管道的外部模型调用、其他插件的任意数据库修改或多进程部署。不要将这些场景标记为已保证隔离。
 强制杀进程可能留下临时原生会话选择，但已持久化的消息索引仍可恢复；新消息仍根据引用重新选题。
-第三方插件若修改请求、注入额外历史或通过按钮构造请求，必须单独验证。不得因为能发送卡片就宣传支持它的全部交互。
+通过按钮构造的请求可按 [交互约定](../CONTINUATION_PROTOCOL.md) 接入；其他请求修改与额外历史注入仍需单独验证。不得因为能发送卡片就宣传支持它的全部交互。
 
 ## 上游依据
 
@@ -27,3 +27,7 @@
 - [逐消息任务生命周期](https://github.com/AstrBotDevs/AstrBot/blob/v4.28.0/astrbot/core/event_bus.py)
 - [飞书消息发送](https://github.com/AstrBotDevs/AstrBot/blob/v4.28.0/astrbot/core/platform/sources/lark/lark_event.py)
 - [飞书获取指定消息](https://open.feishu.cn/document/server-docs/im-v1/message/get)
+
+## 交互入口
+
+`interaction_entry` 在普通插件处理阶段取得会话锁，早于内置 Agent 的 follow-up 捕获；`waiting` 复用已有绑定。交互记录使用独立表，原提问只参与定位。原始合成编号登记别名，发送期间使用真实原提问作为原生飞书回复目标，完成后恢复。协议与生产端责任见 [约定 v1](../CONTINUATION_PROTOCOL.md)。

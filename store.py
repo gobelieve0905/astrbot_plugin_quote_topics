@@ -21,7 +21,7 @@ class Index:
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA foreign_keys=ON")
         version = self.db.execute("PRAGMA user_version").fetchone()[0]
-        if version not in (0, 1):
+        if version not in (0, 1, 2):
             self.db.close()
             raise RuntimeError("Unsupported quote topics database version")
         self.db.executescript("""
@@ -35,7 +35,13 @@ class Index:
                 PRIMARY KEY(scope, mid),
                 FOREIGN KEY(scope,cid) REFERENCES topics(scope,cid) ON DELETE CASCADE
             );
-            PRAGMA user_version=1;
+            CREATE TABLE IF NOT EXISTS interactions (
+                scope TEXT NOT NULL, event_id TEXT NOT NULL, cid TEXT NOT NULL,
+                origin TEXT NOT NULL, actor TEXT NOT NULL, created REAL NOT NULL,
+                PRIMARY KEY(scope,event_id),
+                FOREIGN KEY(scope,cid) REFERENCES topics(scope,cid) ON DELETE CASCADE
+            );
+            PRAGMA user_version=2;
         """)
 
     def lookup(self, scope: str, mid: str) -> Topic | None:
@@ -47,7 +53,7 @@ class Index:
         return Topic(*row) if row else None
 
     def bind(self, scope: str, mid: str, topic: Topic, kind: str):
-        if not mid or kind not in ("input", "reply"):
+        if not mid or kind not in ("input", "reply", "interaction"):
             raise ValueError("Invalid message binding")
         with self.db:
             self.db.execute(
@@ -60,6 +66,38 @@ class Index:
             self.db.execute(
                 "INSERT OR IGNORE INTO messages VALUES(?,?,?,?,?)",
                 (scope, mid, topic.cid, kind, time.time()),
+            )
+
+    def input_topic(self, scope, mid):
+        row = self.db.execute(
+            "SELECT kind FROM messages WHERE scope=? AND mid=?", (scope, mid)
+        ).fetchone()
+        return self.lookup(scope, mid) if row and row[0] == "input" else None
+
+    def interaction(self, scope, event_id):
+        return self.db.execute(
+            "SELECT cid,origin,actor FROM interactions WHERE scope=? AND event_id=?",
+            (scope, event_id),
+        ).fetchone()
+
+    def bind_interaction(self, scope, event_id, origin, actor, mid, topic):
+        # Alias and dedup claim commit together; an alias collision leaves no claim.
+        with self.db:
+            if self.input_topic(scope, origin) != topic:
+                raise ValueError("Interaction origin is not a registered input")
+            previous = self.interaction(scope, event_id)
+            if previous is not None:
+                raise ValueError("Interaction already claimed")
+            existing = self.lookup(scope, mid)
+            if existing and existing != topic:
+                raise ValueError("Interaction message belongs to another topic")
+            self.db.execute(
+                "INSERT OR IGNORE INTO messages VALUES(?,?,?,?,?)",
+                (scope, mid, topic.cid, "interaction", time.time()),
+            )
+            self.db.execute(
+                "INSERT INTO interactions VALUES(?,?,?,?,?,?)",
+                (scope, event_id, topic.cid, origin, actor, time.time()),
             )
 
     def close(self):

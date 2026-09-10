@@ -1,7 +1,7 @@
 name: astrbot_plugin_quote_topics
 display_name: 引用续聊
 desc: 飞书引用续聊：引用消息继续原话题，不引用开启新话题，支持群聊共享、私聊隔离和自动话题标题。
-version: 0.2.4
+version: 0.3.0
 author: gobelieve
 category: 工具
 repo: https://github.com/gobelieve0905/astrbot_plugin_quote_topics
