@@ -163,3 +163,40 @@ class TitleTests(unittest.IsolatedAsyncioTestCase):
         for value, expected in [(1, 20), (999, 240), (180, 180), ("bad", 120)]:
             self.plugin.config["auto_topic_title_timeout"] = value
             self.assertEqual(self.plugin.titles.request_timeout(), expected)
+
+    async def test_mixed_language_title_is_saved_in_full(self):
+        self.plugin.config["auto_topic_title"] = True
+        title = "Idol Empire 昨日 AppLovin 消耗分析"
+        self.provider.text_chat.return_value.completion_text = title
+        self.plugin.titles.schedule(self.topic, "owner")
+        await self.drain()
+        self.assertEqual(self.conv.title, title)
+        self.provider.text_chat.assert_awaited_once()
+
+    async def test_long_title_rewritten_once(self):
+        self.plugin.config["auto_topic_title"] = True
+        self.provider.text_chat.side_effect = [
+            SimpleNamespace(completion_text="分析" * 30),
+            SimpleNamespace(completion_text="Idol Empire 投放消耗分析"),
+        ]
+        self.plugin.titles.schedule(self.topic, "owner")
+        await self.drain()
+        self.assertEqual(self.conv.title, "Idol Empire 投放消耗分析")
+        self.assertEqual(self.provider.text_chat.await_count, 2)
+        self.assertEqual(self.conv.history, self.history)
+
+    async def test_rewrite_still_long_never_saves_cutoff(self):
+        self.plugin.config["auto_topic_title"] = True
+        self.provider.text_chat.return_value.completion_text = "分析" * 30
+        self.plugin.titles.schedule(self.topic, "owner")
+        await self.drain()
+        self.assertEqual(self.conv.title, "引用话题 q1")
+        self.assertEqual(self.provider.text_chat.await_count, 2)
+
+    async def test_invalid_output_does_not_trigger_rewrite(self):
+        self.plugin.config["auto_topic_title"] = True
+        self.provider.text_chat.return_value.completion_text = "标题\n解释"
+        self.plugin.titles.schedule(self.topic, "owner")
+        await self.drain()
+        self.assertEqual(self.conv.title, "引用话题 q1")
+        self.provider.text_chat.assert_awaited_once()
