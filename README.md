@@ -69,7 +69,7 @@ https://github.com/gobelieve0905/astrbot_plugin_quote_topics
 
 ## 卡片按钮与表单续聊
 
-交互插件可通过 [卡片交互续聊约定 v1](CONTINUATION_PROTOCOL.md) 将按钮或表单操作交给本插件，恢复原卡片对应的话题。支持独立操作去重、同群成员共同续聊，以及引用交互后的机器人回复继续讨论。
+交互插件可通过 [卡片交互续聊约定 v1](https://github.com/gobelieve0905/astrbot_plugin_quote_topics/blob/main/CONTINUATION_PROTOCOL.md) 将按钮或表单操作交给本插件，恢复原卡片对应的话题。支持独立操作去重、同群成员共同续聊，以及引用交互后的机器人回复继续讨论。
 
 这是插件间约定，不是 AstrBot 已有标准。交互插件需要在事件入队前提供可信元数据，并遵守真实消息回复目标的约定；仅安装本插件不会自动为其他卡片增加按钮功能。没有交互插件时，普通引用续聊与不引用新开仍可独立使用。
 

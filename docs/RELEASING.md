@@ -7,6 +7,10 @@
 - 简介须保留默认关闭、指定范围与卡片接入条件，不宣称兼容未验证的平台、版本或任意卡片插件。
 - 按 [开发说明](DEVELOPMENT.md) 运行离线检查，并按 [验收清单](ACCEPTANCE.md) 记录验证范围。自动测试不能替代任意第三方插件的真实端到端验收。
 - 使用 `git archive --format=zip --prefix=astrbot_plugin_quote_topics/ --output=dist/astrbot_plugin_quote_topics-v0.3.0.zip HEAD` 打包。后续版本同步修改文件名，避免上传旧包。
-- 包内须包含全部运行时 Python 文件、`metadata.yaml`、`_conf_schema.json`、README、协议、升级说明、排查说明、CHANGELOG 和 LICENSE。
+- 包内须包含全部运行时 Python 文件、`metadata.yaml`、`_conf_schema.json`、README、升级说明、排查说明、CHANGELOG 和 LICENSE。
 - 检查相对链接、配置默认值、许可证及包体积；官方要求 ZIP 不超过16MB。不要包含凭据、个人数据、数据库、Git 元数据或开发缓存。
 - 本地提交说明使用简体中文。发布、部署和用户数据迁移分别确认状态，不以推送成功代替生产验收。
+
+分支、验收标签与手动送审流程见 [统一发布规范](../RELEASING.md)。
+
+- 开发协议和 docs 开发资料通过 `.gitattributes` 自动排除；开发者从 GitHub 查看，不随市场安装包分发。
