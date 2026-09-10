@@ -137,7 +137,9 @@ def runtime(data_dir):
         enabled=True, enable_group=True, group_all=True, enable_private=True, private_all=True
     )
     manager = Manager()
-    plugin = main.QuoteTopics(types.SimpleNamespace(conversation_manager=manager), config)
+    plugin = main.QuoteTopics(
+        types.SimpleNamespace(conversation_manager=manager, get_config=lambda **kw: {}), config
+    )
     return plugin, manager, main.KEY
 
 

@@ -115,3 +115,45 @@ class TitleTests(unittest.IsolatedAsyncioTestCase):
         await self.plugin.titles.close()
         self.assertFalse(self.plugin.titles.tasks)
         self.assertEqual(self.conv.title, "引用话题 q1")
+
+    async def test_configured_fallback_after_primary_404(self):
+        self.plugin.config["auto_topic_title"] = True
+        backup = SimpleNamespace(
+            text_chat=AsyncMock(return_value=SimpleNamespace(completion_text="备用模型生成的标题"))
+        )
+        self.plugin.context.get_config = lambda **kw: {
+            "agent_runner": {
+                "runner_type": "local",
+                "config": {
+                    "model": {"fallback_provider_ids": ["missing", "primary", "backup", "backup"]}
+                },
+            }
+        }
+        providers = {"primary": self.provider, "backup": backup}
+        self.plugin.context.get_provider_by_id = providers.get
+        self.provider.text_chat.side_effect = type("NotFoundError", (Exception,), {})()
+        self.plugin.titles.schedule(self.topic, "owner")
+        await self.drain()
+        self.assertEqual(self.conv.title, "备用模型生成的标题")
+        self.assertEqual(self.conv.history, self.history)
+        self.provider.text_chat.assert_awaited_once()
+        backup.text_chat.assert_awaited_once()
+        self.assertEqual(
+            backup.text_chat.call_args.kwargs, self.provider.text_chat.call_args.kwargs
+        )
+
+    async def test_all_candidates_fail_keep_placeholder(self):
+        self.plugin.config["auto_topic_title"] = True
+        backup = SimpleNamespace(text_chat=AsyncMock(return_value=SimpleNamespace(role="err")))
+        self.plugin.context.get_config = lambda **kw: {
+            "agent_runner": {
+                "runner_type": "local",
+                "config": {"model": {"fallback_provider_ids": ["backup"]}},
+            }
+        }
+        self.plugin.context.get_provider_by_id = lambda _: backup
+        self.provider.text_chat.side_effect = TimeoutError
+        self.plugin.titles.schedule(self.topic, "owner")
+        await self.drain()
+        self.assertEqual(self.conv.title, "引用话题 q1")
+        backup.text_chat.assert_awaited_once()

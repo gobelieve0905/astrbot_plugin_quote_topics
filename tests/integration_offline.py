@@ -137,6 +137,7 @@ async def main():
         # Run the optional title path with real persisted history and manager APIs.
         from unittest.mock import AsyncMock
 
+        plugin.context.get_config = lambda **kw: {}
         plugin.config["auto_topic_title"] = True
         provider = types.SimpleNamespace(
             text_chat=AsyncMock(return_value=types.SimpleNamespace(completion_text="群聊话题测试"))

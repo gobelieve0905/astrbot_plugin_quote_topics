@@ -73,10 +73,7 @@ class Titles:
                 break
         if roles != {"user", "assistant"}:
             return
-        provider = await self.context.get_using_provider_async(umo=umo)
-        if provider is None:
-            return
-        response = await provider.text_chat(
+        kwargs = dict(
             system_prompt=(
                 "你是话题标题生成器。概括下面对话的核心主题，使用对话的语言，"
                 "生成不超过24个字符的简短标题。只输出标题，不加引号、解释或换行。"
@@ -87,6 +84,9 @@ class Titles:
             contexts=[],
             request_max_retries=1,
         )
+        response = await self.complete(umo, kwargs)
+        if response is None:
+            return
         title = (response.completion_text or "").strip().strip("\"'“”")
         if not title or "<None>" in title or len(title) > 48 or "\n" in title:
             return
@@ -100,6 +100,40 @@ class Titles:
             and current.title == original
         ):
             await manager.update_conversation(topic.owner, conversation_id=topic.cid, title=title)
+
+    async def complete(self, umo, kwargs):
+        primary = await self.context.get_using_provider_async(umo=umo)
+        config = self.context.get_config(umo=umo)
+        runner = config.get("agent_runner", {})
+        fallback_ids = (
+            runner.get("config", {}).get("model", {}).get("fallback_provider_ids", [])
+            if runner.get("runner_type") == "local"
+            else []
+        )
+        candidates = [primary] if primary is not None else []
+        if isinstance(fallback_ids, list):
+            for provider_id in fallback_ids:
+                if not isinstance(provider_id, str) or not provider_id:
+                    continue
+                provider = self.context.get_provider_by_id(provider_id)
+                if provider is not None and all(provider is not p for p in candidates):
+                    candidates.append(provider)
+        for candidate in candidates:
+            if not self.enabled():
+                return None
+            try:
+                # A slow primary must leave time for the configured backup.
+                async with asyncio.timeout(20):
+                    response = await candidate.text_chat(**kwargs)
+                if response is None or getattr(response, "role", "assistant") == "err":
+                    raise ValueError("Title provider returned no successful response")
+                return response
+            except Exception as exc:
+                logger.warning(
+                    "Quote topics title provider failed (%s); trying configured fallback if any",
+                    type(exc).__name__,
+                )
+        return None
 
     async def close(self):
         self.closed = True
