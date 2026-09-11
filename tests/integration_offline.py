@@ -100,6 +100,34 @@ async def main():
         return req
 
     try:
+        # Exercise the actual core failure-save branch with real SQLite storage.
+        from astrbot.core.pipeline.process_stage.method.agent_sub_stages.internal import (
+            InternalAgentSubStage,
+        )
+
+        failed = event("failed-original")
+
+        async def failed_pipeline():
+            await plugin.waiting(failed)
+            cid = await manager.get_curr_conversation_id(failed.unified_msg_origin)
+            conv = await manager.get_conversation(failed.unified_msg_origin, cid)
+            req = ProviderRequest(prompt="原始产品问题", conversation=conv, contexts=[])
+            await plugin.request(failed, req)
+            await InternalAgentSubStage._save_to_history(
+                types.SimpleNamespace(conv_manager=manager), failed, req, None, [], None
+            )
+            unchanged = await manager.get_conversation(conv.user_id, cid)
+            assert json.loads(unchanged.history) == []
+            return cid
+
+        failed_cid = await asyncio.create_task(failed_pipeline())
+        await asyncio.sleep(0)
+        await asyncio.gather(*list(plugin.cleanups))
+        recovered = await turn(event("retry-original", "failed-original"))
+        assert recovered.conversation.cid == failed_cid
+        assert len(recovered.contexts) == 1
+        assert "原始产品问题" in recovered.contexts[0]["content"]
+
         one = await turn(event("q1"))
         two = await turn(event("q2"))
         assert one.conversation.cid != two.conversation.cid

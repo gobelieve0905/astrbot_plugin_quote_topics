@@ -69,7 +69,7 @@ https://github.com/gobelieve0905/astrbot_plugin_quote_topics
 
 ## 卡片按钮与表单续聊
 
-交互插件可通过 [卡片交互续聊约定 v1](CONTINUATION_PROTOCOL.md) 将按钮或表单操作交给本插件，恢复原卡片对应的话题。支持独立操作去重、同群成员共同续聊，以及引用交互后的机器人回复继续讨论。
+交互插件可通过 [卡片交互续聊约定 v1](https://github.com/gobelieve0905/astrbot_plugin_quote_topics/blob/main/CONTINUATION_PROTOCOL.md) 将按钮或表单操作交给本插件，恢复原卡片对应的话题。支持独立操作去重、同群成员共同续聊，以及引用交互后的机器人回复继续讨论。
 
 这是插件间约定，不是 AstrBot 已有标准。交互插件需要在事件入队前提供可信元数据，并遵守真实消息回复目标的约定；仅安装本插件不会自动为其他卡片增加按钮功能。没有交互插件时，普通引用续聊与不引用新开仍可独立使用。
 
@@ -128,3 +128,8 @@ https://github.com/gobelieve0905/astrbot_plugin_quote_topics
 - [更新记录](CHANGELOG.md)
 - [开发说明](https://github.com/gobelieve0905/astrbot_plugin_quote_topics/blob/main/docs/DEVELOPMENT.md)
 - [MIT 许可证](LICENSE)
+
+
+范围列表支持下拉多选：平台实例来自飞书机器人配置，群聊和私聊来自 AstrBot 已有会话记录；选项每 30 秒刷新，重新打开配置查看。尚未产生会话记录的群或用户需先与机器人建立会话。历史已选 ID 会保留；空列表和排除规则不变。
+
+群聊/私聊选项显示“名称（编号）”，优先使用 AstrBot 会话备注及已记录名称；群名缺失时读取飞书群信息并缓存 10 分钟。权限不足或私聊尚无昵称记录时显示“未获取名称（编号）”，仍可选择。保存值始终为 ID。

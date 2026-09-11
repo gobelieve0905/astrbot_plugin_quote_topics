@@ -97,8 +97,11 @@ class Manager:
     async def get_conversation(self, umo, cid):
         return self.conversations.get(cid)
 
-    async def update_conversation(self, umo, conversation_id=None, title=None):
-        self.conversations[conversation_id].title = title
+    async def update_conversation(self, umo, conversation_id=None, title=None, history=None):
+        if title is not None:
+            self.conversations[conversation_id].title = title
+        if history is not None:
+            self.conversations[conversation_id].history = json.dumps(history)
 
 
 def runtime(data_dir):

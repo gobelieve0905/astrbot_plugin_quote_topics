@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
@@ -33,6 +34,108 @@ class QuoteTopics(Star):
         self.active = set()
         self.closed = False
         self.titles = Titles(context, config)
+        self.option_task = None
+        self.option_names = {}
+
+    async def option_name(self, platform, kind, peer, aliases):
+        umo = f"{platform}:{kind}:{peer}"
+        alias = aliases.get(umo)
+        name = getattr(alias, "user_alias", "") or getattr(alias, "auto_name", "")
+        if name and name not in (umo, peer):
+            return name
+        if kind != "GroupMessage":
+            return ""
+        key = (platform, peer)
+        cached = self.option_names.get(key)
+        if cached and cached[0] > time.monotonic():
+            return cached[1]
+        name = ""
+        try:
+            from lark_oapi.api.im.v1 import GetChatRequest
+
+            adapter = self.context.get_platform_inst(platform)
+            async with asyncio.timeout(5):
+                response = await adapter.lark_api.im.v1.chat.aget(
+                    GetChatRequest.builder().chat_id(peer).build()
+                )
+            if response.success() and response.data:
+                name = response.data.name or ""
+        except Exception:
+            pass  # Missing permissions must never prevent editing the scope.
+        self.option_names[key] = (time.monotonic() + 600, name)
+        return name
+
+    async def refresh_options(self):
+        schema = getattr(self.config, "schema", None)
+        if not isinstance(schema, dict):
+            return
+        platforms = {
+            p["id"]
+            for p in self.context.get_config().get("platform", [])
+            if isinstance(p, dict)
+            and p.get("type") == "lark"
+            and isinstance(p.get("id"), str)
+            and p["id"]
+        }
+        groups, users = set(), set()
+        names = {}
+        try:
+            from astrbot.core import db_helper
+
+            aliases = {a.umo: a for a in await db_helper.get_umo_aliases()}
+        except (ImportError, AttributeError):
+            aliases = {}
+        for platform in platforms:
+            conversations = await self.context.conversation_manager.get_conversations(
+                platform_id=platform
+            )
+            for conversation in conversations:
+                parts = conversation.user_id.split(":", 2)
+                if len(parts) != 3 or parts[0] != platform or not parts[2]:
+                    continue
+                if parts[1] in ("GroupMessage", "FriendMessage"):
+                    name = await self.option_name(platform, parts[1], parts[2], aliases)
+                    if name:
+                        names[(parts[1], parts[2])] = name
+                if parts[1] == "GroupMessage":
+                    groups.add(parts[2])
+                elif parts[1] == "FriendMessage":
+                    users.add(parts[2])
+        for key, values in (
+            ("platform_ids", platforms),
+            ("group_ids", groups),
+            ("excluded_group_ids", groups),
+            ("private_ids", users),
+            ("excluded_private_ids", users),
+        ):
+            selected = self.config.get(key, [])
+            retained = (
+                {v for v in selected if isinstance(v, str) and v}
+                if isinstance(selected, list)
+                else set()
+            )
+            if key in schema:
+                options = sorted(values | retained)
+                schema[key]["options"] = options
+                if key != "platform_ids":
+                    kind = "GroupMessage" if "group" in key else "FriendMessage"
+                    schema[key]["labels"] = [
+                        f"{names[(kind, peer)]}（{peer}）"
+                        if (kind, peer) in names
+                        else f"未获取名称（{peer}）"
+                        for peer in options
+                    ]
+
+    async def initialize(self):
+        async def watch():
+            while not self.closed:
+                try:
+                    await self.refresh_options()
+                except Exception as exc:
+                    logger.warning("Quote topics selector refresh failed (%s)", type(exc).__name__)
+                await asyncio.sleep(30)
+
+        self.option_task = asyncio.create_task(watch())
 
     async def refuse(self, event, message):
         # AstrBot catches hook exceptions; stop FIRST so failures cannot fall
@@ -66,7 +169,32 @@ class QuoteTopics(Star):
             manager.session_conversations.pop(umo, None)
             await sp.session_remove(umo, "sel_conv_id")
 
+    async def preserve_unsaved_question(self, binding):
+        snapshot = binding.get("question_snapshot")
+        if snapshot is None:
+            return
+        history, prompt = snapshot
+        topic = binding["topic"]
+        manager = self.context.conversation_manager
+        conversation = await manager.get_conversation(topic.owner, topic.cid)
+        if not conversation or conversation.user_id != topic.owner:
+            return
+        # The pipeline has finished and still owns the scope lock. Never replace
+        # history written by the core (including partial output/checkpoints).
+        current = json.loads(conversation.history or "[]")
+        if current != history:
+            return
+        await manager.update_conversation(
+            topic.owner,
+            topic.cid,
+            history=history + [{"role": "user", "content": prompt}],
+        )
+
     async def cleanup(self, event, binding, task):
+        try:
+            await self.preserve_unsaved_question(binding)
+        except Exception as exc:
+            logger.error("Quote topics question preservation failed (%s)", type(exc).__name__)
         try:
             await self.restore_selection(binding["umo"], binding["topic"].cid, binding["previous"])
         except Exception as exc:
@@ -269,6 +397,12 @@ class QuoteTopics(Star):
             )
             req.prompt = f"[本次群聊发言人 {identity}]\n" + (req.prompt or "")
 
+        if req.prompt and "question_snapshot" not in binding:
+            binding["question_snapshot"] = (
+                json.loads(req.conversation.history or "[]"),
+                req.prompt,
+            )
+
     @filter.command("话题状态")
     async def status(self, event: AstrMessageEvent):
         state = "已启用" if enabled(self.config, event) else "未启用"
@@ -280,6 +414,9 @@ class QuoteTopics(Star):
 
     async def terminate(self):
         self.closed = True
+        if self.option_task:
+            self.option_task.cancel()
+            await asyncio.gather(self.option_task, return_exceptions=True)
         # Do not cancel user generations or close their database underneath them.
         active = list(self.active)
         if active:
