@@ -124,12 +124,18 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
                 SimpleNamespace(user_id="qq:GroupMessage:wrong"),
             ]
         )
+        self.plugin.option_name = AsyncMock(return_value="测试名称")
         await self.plugin.refresh_options()
         self.assertEqual(config.schema["platform_ids"]["options"], ["lark-1"])
         self.assertEqual(config.schema["group_ids"]["options"], ["oc_group", "old-group"])
         self.assertEqual(config.schema["excluded_group_ids"]["options"], ["oc_group"])
         self.assertEqual(config.schema["private_ids"]["options"], ["ou_user"])
         self.assertEqual(config["group_ids"], ["old-group"])
+        self.assertEqual(
+            config.schema["group_ids"]["labels"],
+            ["测试名称（oc_group）", "未获取名称（old-group）"],
+        )
+        self.assertEqual(config.schema["private_ids"]["labels"], ["测试名称（ou_user）"])
 
     async def test_new_topics_resume_old_and_keep_legacy_selection(self):
         original = await self.manager.new_conversation(Event().unified_msg_origin)

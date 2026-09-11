@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
@@ -34,6 +35,35 @@ class QuoteTopics(Star):
         self.closed = False
         self.titles = Titles(context, config)
         self.option_task = None
+        self.option_names = {}
+
+    async def option_name(self, platform, kind, peer, aliases):
+        umo = f"{platform}:{kind}:{peer}"
+        alias = aliases.get(umo)
+        name = getattr(alias, "user_alias", "") or getattr(alias, "auto_name", "")
+        if name and name not in (umo, peer):
+            return name
+        if kind != "GroupMessage":
+            return ""
+        key = (platform, peer)
+        cached = self.option_names.get(key)
+        if cached and cached[0] > time.monotonic():
+            return cached[1]
+        name = ""
+        try:
+            from lark_oapi.api.im.v1 import GetChatRequest
+
+            adapter = self.context.get_platform_inst(platform)
+            async with asyncio.timeout(5):
+                response = await adapter.lark_api.im.v1.chat.aget(
+                    GetChatRequest.builder().chat_id(peer).build()
+                )
+            if response.success() and response.data:
+                name = response.data.name or ""
+        except Exception:
+            pass  # Missing permissions must never prevent editing the scope.
+        self.option_names[key] = (time.monotonic() + 600, name)
+        return name
 
     async def refresh_options(self):
         schema = getattr(self.config, "schema", None)
@@ -48,6 +78,13 @@ class QuoteTopics(Star):
             and p["id"]
         }
         groups, users = set(), set()
+        names = {}
+        try:
+            from astrbot.core import db_helper
+
+            aliases = {a.umo: a for a in await db_helper.get_umo_aliases()}
+        except (ImportError, AttributeError):
+            aliases = {}
         for platform in platforms:
             conversations = await self.context.conversation_manager.get_conversations(
                 platform_id=platform
@@ -56,6 +93,10 @@ class QuoteTopics(Star):
                 parts = conversation.user_id.split(":", 2)
                 if len(parts) != 3 or parts[0] != platform or not parts[2]:
                     continue
+                if parts[1] in ("GroupMessage", "FriendMessage"):
+                    name = await self.option_name(platform, parts[1], parts[2], aliases)
+                    if name:
+                        names[(parts[1], parts[2])] = name
                 if parts[1] == "GroupMessage":
                     groups.add(parts[2])
                 elif parts[1] == "FriendMessage":
@@ -74,7 +115,16 @@ class QuoteTopics(Star):
                 else set()
             )
             if key in schema:
-                schema[key]["options"] = sorted(values | retained)
+                options = sorted(values | retained)
+                schema[key]["options"] = options
+                if key != "platform_ids":
+                    kind = "GroupMessage" if "group" in key else "FriendMessage"
+                    schema[key]["labels"] = [
+                        f"{names[(kind, peer)]}（{peer}）"
+                        if (kind, peer) in names
+                        else f"未获取名称（{peer}）"
+                        for peer in options
+                    ]
 
     async def initialize(self):
         async def watch():
