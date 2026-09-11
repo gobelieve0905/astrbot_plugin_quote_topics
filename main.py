@@ -66,7 +66,32 @@ class QuoteTopics(Star):
             manager.session_conversations.pop(umo, None)
             await sp.session_remove(umo, "sel_conv_id")
 
+    async def preserve_unsaved_question(self, binding):
+        snapshot = binding.get("question_snapshot")
+        if snapshot is None:
+            return
+        history, prompt = snapshot
+        topic = binding["topic"]
+        manager = self.context.conversation_manager
+        conversation = await manager.get_conversation(topic.owner, topic.cid)
+        if not conversation or conversation.user_id != topic.owner:
+            return
+        # The pipeline has finished and still owns the scope lock. Never replace
+        # history written by the core (including partial output/checkpoints).
+        current = json.loads(conversation.history or "[]")
+        if current != history:
+            return
+        await manager.update_conversation(
+            topic.owner,
+            topic.cid,
+            history=history + [{"role": "user", "content": prompt}],
+        )
+
     async def cleanup(self, event, binding, task):
+        try:
+            await self.preserve_unsaved_question(binding)
+        except Exception as exc:
+            logger.error("Quote topics question preservation failed (%s)", type(exc).__name__)
         try:
             await self.restore_selection(binding["umo"], binding["topic"].cid, binding["previous"])
         except Exception as exc:
@@ -268,6 +293,12 @@ class QuoteTopics(Star):
                 {"id": event.get_sender_id(), "name": event.get_sender_name()}, ensure_ascii=False
             )
             req.prompt = f"[本次群聊发言人 {identity}]\n" + (req.prompt or "")
+
+        if req.prompt and "question_snapshot" not in binding:
+            binding["question_snapshot"] = (
+                json.loads(req.conversation.history or "[]"),
+                req.prompt,
+            )
 
     @filter.command("话题状态")
     async def status(self, event: AstrMessageEvent):

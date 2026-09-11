@@ -41,6 +41,61 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.gather(*list(self.plugin.cleanups))
         return result
 
+    async def test_failed_then_cancelled_turn_preserves_question_across_quotes(self):
+        async def failed_turn(event, prompt, cancel=False):
+            async def pipeline():
+                await self.plugin.waiting(event)
+                req = await build_request(self.manager, event)
+                req.prompt = prompt
+                await self.plugin.request(event, req)
+                if cancel:
+                    raise asyncio.CancelledError
+                return req
+
+            task = asyncio.create_task(pipeline())
+            try:
+                result = await task
+            except asyncio.CancelledError:
+                result = None
+            await asyncio.sleep(0)
+            await asyncio.gather(*list(self.plugin.cleanups))
+            return result
+
+        first = await failed_turn(Event("q1"), "idol empire产品什么情况？")
+        await self.run_turn(Event("other-topic"))
+        await failed_turn(Event("q2", parent="q1", user="bob"), "再回答一次", True)
+        resumed = await self.run_turn(Event("q3", parent="q2"))
+        self.assertEqual(resumed.conversation.cid, first.conversation.cid)
+        self.assertIn("idol empire产品什么情况？", str(resumed.contexts))
+        self.assertIn("bob", str(resumed.contexts))
+        self.assertEqual(len(resumed.contexts), 2)
+        self.assertFalse(self.plugin.locks)
+
+    async def test_preservation_does_not_overwrite_core_history_or_deleted_topic(self):
+        for delete in (False, True):
+            event = Event("deleted" if delete else "saved")
+
+            async def pipeline(event=event, delete=delete):
+                await self.plugin.waiting(event)
+                req = await build_request(self.manager, event)
+                await self.plugin.request(event, req)
+                cid = req.conversation.cid
+                if delete:
+                    del self.manager.conversations[cid]
+                else:
+                    req.conversation.history = '[{"role":"assistant","content":"partial"}]'
+                return cid
+
+            cid = await asyncio.create_task(pipeline())
+            await asyncio.sleep(0)
+            await asyncio.gather(*list(self.plugin.cleanups))
+            if not delete:
+                self.assertEqual(
+                    json.loads(self.manager.conversations[cid].history),
+                    [{"role": "assistant", "content": "partial"}],
+                )
+            self.assertFalse(self.plugin.locks)
+
     async def test_new_topics_resume_old_and_keep_legacy_selection(self):
         original = await self.manager.new_conversation(Event().unified_msg_origin)
         self.manager.conversations[original].history = '["legacy secret"]'
@@ -149,7 +204,9 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0)
         req = await self.run_turn(Event("q2", parent="q1"))
         self.assertIsNotNone(req)
-        self.assertEqual(req.contexts, [])
+        self.assertEqual(len(req.contexts), 1)
+        self.assertEqual(req.contexts[0]["role"], "user")
+        self.assertIn("hello", req.contexts[0]["content"])
 
     async def test_refusal_send_failure_still_stops_request(self):
         event = Event(parent="unknown")
