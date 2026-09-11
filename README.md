@@ -128,3 +128,6 @@ https://github.com/gobelieve0905/astrbot_plugin_quote_topics
 - [更新记录](CHANGELOG.md)
 - [开发说明](https://github.com/gobelieve0905/astrbot_plugin_quote_topics/blob/main/docs/DEVELOPMENT.md)
 - [MIT 许可证](LICENSE)
+
+
+范围列表支持下拉多选：平台实例来自飞书机器人配置，群聊和私聊来自 AstrBot 已有会话记录；选项每 30 秒刷新，重新打开配置查看。尚未产生会话记录的群或用户需先与机器人建立会话。历史已选 ID 会保留；空列表和排除规则不变。

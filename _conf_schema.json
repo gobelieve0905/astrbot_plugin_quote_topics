@@ -9,7 +9,8 @@
     "description": "平台实例范围",
     "type": "list",
     "default": [],
-    "hint": "留空表示全部实例；填写 AstrBot 平台实例 ID，不是飞书 App ID。"
+    "hint": "留空表示全部实例；填写 AstrBot 平台实例 ID，不是飞书 App ID。 下拉多选；选项来自已配置飞书实例和已有会话，保留历史选中 ID。新会话出现后重新打开配置刷新。",
+    "options": []
   },
   "enable_group": {
     "description": "群聊开关",
@@ -27,13 +28,15 @@
     "description": "指定群聊列表",
     "type": "list",
     "default": [],
-    "hint": "填写群号（oc_ 开头）；空列表且未开启全部时，不启用任何会话。"
+    "hint": "填写群号（oc_ 开头）；空列表且未开启全部时，不启用任何会话。 下拉多选；选项来自已配置飞书实例和已有会话，保留历史选中 ID。新会话出现后重新打开配置刷新。",
+    "options": []
   },
   "excluded_group_ids": {
     "description": "排除群聊列表",
     "type": "list",
     "default": [],
-    "hint": "优先于全部和指定列表；填写群号（oc_ 开头）。"
+    "hint": "优先于全部和指定列表；填写群号（oc_ 开头）。 下拉多选；选项来自已配置飞书实例和已有会话，保留历史选中 ID。新会话出现后重新打开配置刷新。",
+    "options": []
   },
   "enable_private": {
     "description": "私聊开关",
@@ -51,13 +54,15 @@
     "description": "指定私聊列表",
     "type": "list",
     "default": [],
-    "hint": "填写用户 Open ID（ou_ 开头）；空列表且未开启全部时，不启用任何会话。"
+    "hint": "填写用户 Open ID（ou_ 开头）；空列表且未开启全部时，不启用任何会话。 下拉多选；选项来自已配置飞书实例和已有会话，保留历史选中 ID。新会话出现后重新打开配置刷新。",
+    "options": []
   },
   "excluded_private_ids": {
     "description": "排除私聊列表",
     "type": "list",
     "default": [],
-    "hint": "优先于全部和指定列表；填写用户 Open ID（ou_ 开头）。"
+    "hint": "优先于全部和指定列表；填写用户 Open ID（ou_ 开头）。 下拉多选；选项来自已配置飞书实例和已有会话，保留历史选中 ID。新会话出现后重新打开配置刷新。",
+    "options": []
   },
   "auto_topic_title": {
     "description": "自动总结话题标题",

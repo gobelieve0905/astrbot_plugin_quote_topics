@@ -33,6 +33,59 @@ class QuoteTopics(Star):
         self.active = set()
         self.closed = False
         self.titles = Titles(context, config)
+        self.option_task = None
+
+    async def refresh_options(self):
+        schema = getattr(self.config, "schema", None)
+        if not isinstance(schema, dict):
+            return
+        platforms = {
+            p["id"]
+            for p in self.context.get_config().get("platform", [])
+            if isinstance(p, dict)
+            and p.get("type") == "lark"
+            and isinstance(p.get("id"), str)
+            and p["id"]
+        }
+        groups, users = set(), set()
+        for platform in platforms:
+            conversations = await self.context.conversation_manager.get_conversations(
+                platform_id=platform
+            )
+            for conversation in conversations:
+                parts = conversation.user_id.split(":", 2)
+                if len(parts) != 3 or parts[0] != platform or not parts[2]:
+                    continue
+                if parts[1] == "GroupMessage":
+                    groups.add(parts[2])
+                elif parts[1] == "FriendMessage":
+                    users.add(parts[2])
+        for key, values in (
+            ("platform_ids", platforms),
+            ("group_ids", groups),
+            ("excluded_group_ids", groups),
+            ("private_ids", users),
+            ("excluded_private_ids", users),
+        ):
+            selected = self.config.get(key, [])
+            retained = (
+                {v for v in selected if isinstance(v, str) and v}
+                if isinstance(selected, list)
+                else set()
+            )
+            if key in schema:
+                schema[key]["options"] = sorted(values | retained)
+
+    async def initialize(self):
+        async def watch():
+            while not self.closed:
+                try:
+                    await self.refresh_options()
+                except Exception as exc:
+                    logger.warning("Quote topics selector refresh failed (%s)", type(exc).__name__)
+                await asyncio.sleep(30)
+
+        self.option_task = asyncio.create_task(watch())
 
     async def refuse(self, event, message):
         # AstrBot catches hook exceptions; stop FIRST so failures cannot fall
@@ -311,6 +364,9 @@ class QuoteTopics(Star):
 
     async def terminate(self):
         self.closed = True
+        if self.option_task:
+            self.option_task.cancel()
+            await asyncio.gather(self.option_task, return_exceptions=True)
         # Do not cancel user generations or close their database underneath them.
         active = list(self.active)
         if active:

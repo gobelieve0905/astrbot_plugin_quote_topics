@@ -96,6 +96,41 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
                 )
             self.assertFalse(self.plugin.locks)
 
+    async def test_selector_options_keep_old_values_and_filter_platforms(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
+
+        class Config(dict):
+            pass
+
+        config = Config(self.plugin.config)
+        keys = (
+            "platform_ids",
+            "group_ids",
+            "excluded_group_ids",
+            "private_ids",
+            "excluded_private_ids",
+        )
+        config.schema = {key: {"options": []} for key in keys}
+        config["group_ids"] = ["old-group"]
+        self.plugin.config = config
+        self.plugin.context.get_config = lambda: {
+            "platform": [{"id": "lark-1", "type": "lark"}, {"id": "qq", "type": "qq"}]
+        }
+        self.manager.get_conversations = AsyncMock(
+            return_value=[
+                SimpleNamespace(user_id="lark-1:GroupMessage:oc_group"),
+                SimpleNamespace(user_id="lark-1:FriendMessage:ou_user"),
+                SimpleNamespace(user_id="qq:GroupMessage:wrong"),
+            ]
+        )
+        await self.plugin.refresh_options()
+        self.assertEqual(config.schema["platform_ids"]["options"], ["lark-1"])
+        self.assertEqual(config.schema["group_ids"]["options"], ["oc_group", "old-group"])
+        self.assertEqual(config.schema["excluded_group_ids"]["options"], ["oc_group"])
+        self.assertEqual(config.schema["private_ids"]["options"], ["ou_user"])
+        self.assertEqual(config["group_ids"], ["old-group"])
+
     async def test_new_topics_resume_old_and_keep_legacy_selection(self):
         original = await self.manager.new_conversation(Event().unified_msg_origin)
         self.manager.conversations[original].history = '["legacy secret"]'
