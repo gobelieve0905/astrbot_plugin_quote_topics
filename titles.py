@@ -55,7 +55,7 @@ class Titles:
         messages = []
         roles = set()
         # Only a small excerpt of this topic, excluding tools and media.
-        for message in json.loads(conversation.history or "[]")[:12]:
+        for message in json.loads(conversation.history or "[]"):
             if not isinstance(message, dict) or message.get("role") not in ("user", "assistant"):
                 continue
             content = message.get("content")
@@ -69,7 +69,17 @@ class Titles:
                 continue
             roles.add(message["role"])
             messages.append({"role": message["role"], "content": content[:1500]})
-            if len(messages) >= 4:
+            # Bound the excerpt after filtering tool-only records. A long tool
+            # chain must not hide the final textual answer. Keep room for both
+            # roles even after several failed user-only turns.
+            if len(messages) > 4:
+                removable = next(
+                    i
+                    for i, item in enumerate(messages[1:-1], start=1)
+                    if sum(m["role"] == item["role"] for m in messages) > 1
+                )
+                messages.pop(removable)
+            if len(messages) >= 4 and roles == {"user", "assistant"}:
                 break
         if roles != {"user", "assistant"}:
             return

@@ -38,6 +38,37 @@ class TitleTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.gather(*list(self.plugin.titles.tasks.values()))
         await asyncio.sleep(0)
 
+    async def test_final_answer_after_long_tool_chain_generates_title(self):
+        self.plugin.config["auto_topic_title"] = True
+        self.conv.history = json.dumps(
+            [{"role": "user", "content": "分析产品情况"}]
+            + [{"role": "assistant", "content": None}, {"role": "tool", "content": "TOOL_SECRET"}]
+            * 10
+            + [{"role": "assistant", "content": "产品情况分析结果"}]
+        )
+        original = self.conv.history
+        self.plugin.titles.schedule(self.topic, "owner")
+        await self.drain()
+        self.assertEqual(self.conv.title, "飞书插件安装排查")
+        prompt = self.provider.text_chat.call_args.kwargs["prompt"]
+        self.assertIn("产品情况分析结果", prompt)
+        self.assertNotIn("TOOL_SECRET", prompt)
+        self.assertEqual(self.conv.history, original)
+
+    async def test_multiple_failed_questions_do_not_hide_answer(self):
+        self.plugin.config["auto_topic_title"] = True
+        self.conv.history = json.dumps(
+            [{"role": "user", "content": "原始产品问题"}]
+            + [{"role": "user", "content": "再回答一次"}] * 8
+            + [{"role": "assistant", "content": "最终回答"}]
+        )
+        self.plugin.titles.schedule(self.topic, "owner")
+        await self.drain()
+        messages = json.loads(self.provider.text_chat.call_args.kwargs["prompt"])
+        self.assertLessEqual(len(messages), 4)
+        self.assertEqual(messages[0]["content"], "原始产品问题")
+        self.assertEqual({m["role"] for m in messages}, {"user", "assistant"})
+
     async def test_default_off(self):
         self.plugin.titles.schedule(self.topic, "owner")
         await self.drain()
