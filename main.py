@@ -239,8 +239,8 @@ class QuoteTopics(Star):
                 raise CannotRestore("当前版本仅适配飞书，请将其他平台排除在启用范围外。")
             from astrbot import __version__
 
-            if __version__ != "4.28.0":
-                raise CannotRestore("当前版本仅验证 AstrBot 4.28.0，请禁用插件或使用兼容版本。")
+            if __version__ not in {"4.28.0", "4.28.1"}:
+                raise CannotRestore("当前版本仅验证 AstrBot 4.28.0 / 4.28.1，请禁用插件或使用兼容版本。")
             if event.get_extra("provider_request") is not None:
                 raise CannotRestore("其他插件接管了本次模型请求，无法保证话题隔离。")
             scope = scope_of(event)
@@ -408,7 +408,7 @@ class QuoteTopics(Star):
         state = "已启用" if enabled(self.config, event) else "未启用"
         yield event.plain_result(
             f"引用续聊：本会话{state}。\n"
-            "规则：引用续聊，不引用新开。支持 AstrBot 4.28.0 的飞书内置 Agent。\n"
+            "规则：引用续聊，不引用新开。支持 AstrBot 4.28.0 / 4.28.1 的飞书内置 Agent。\n"
             "恢复机器人回复所属话题需要飞书读取消息权限。"
         )
 
