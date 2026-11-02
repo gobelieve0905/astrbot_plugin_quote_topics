@@ -108,7 +108,7 @@ def runtime(data_dir):
     from unittest.mock import Mock
 
     astrbot = types.ModuleType("astrbot")
-    astrbot.__version__ = "4.28.0"
+    astrbot.__version__ = "4.29.4"
     api = types.ModuleType("astrbot.api")
     api.AstrBotConfig, api.logger = dict, Mock()
     events = types.ModuleType("astrbot.api.event")

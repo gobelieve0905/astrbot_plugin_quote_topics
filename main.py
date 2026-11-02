@@ -1,8 +1,9 @@
-"""AstrBot 4.28.0 quote topics. No dependency on a card plugin."""
+"""AstrBot 4.x quote topics with interface compatibility checks. No dependency on a card plugin."""
 
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import time
 
@@ -237,10 +238,30 @@ class QuoteTopics(Star):
         try:
             if event.get_platform_name() != "lark":
                 raise CannotRestore("当前版本仅适配飞书，请将其他平台排除在启用范围外。")
-            from astrbot import __version__
-
-            if __version__ not in {"4.28.0", "4.28.1"}:
-                raise CannotRestore("当前版本仅验证 AstrBot 4.28.0 / 4.28.1，请禁用插件或使用兼容版本。")
+            # Check the APIs we use before acquiring locks or changing a topic.
+            # Host patch/minor version numbers do not determine compatibility.
+            manager = getattr(self.context, "conversation_manager", None)
+            calls = (
+                ("get_curr_conversation_id", (umo,), {}),
+                ("switch_conversation", (umo, ""), {}),
+                ("get_conversation", (umo, ""), {}),
+                (
+                    "new_conversation",
+                    (umo, event.get_platform_id()),
+                    {"persona_id": None, "title": ""},
+                ),
+                ("update_conversation", (umo, ""), {"history": []}),
+            )
+            for name, args, kwargs in calls:
+                method = getattr(manager, name, None)
+                try:
+                    if not callable(method):
+                        raise TypeError
+                    inspect.signature(method).bind(*args, **kwargs)
+                except (TypeError, ValueError):
+                    raise CannotRestore(f"AstrBot 话题接口不兼容（{name}），请更新插件。") from None
+            if not callable(getattr(getattr(manager, "session_conversations", None), "pop", None)):
+                raise CannotRestore("AstrBot 会话选择接口不兼容，请更新插件。")
             if event.get_extra("provider_request") is not None:
                 raise CannotRestore("其他插件接管了本次模型请求，无法保证话题隔离。")
             scope = scope_of(event)
@@ -408,7 +429,7 @@ class QuoteTopics(Star):
         state = "已启用" if enabled(self.config, event) else "未启用"
         yield event.plain_result(
             f"引用续聊：本会话{state}。\n"
-            "规则：引用续聊，不引用新开。支持 AstrBot 4.28.0 / 4.28.1 的飞书内置 Agent。\n"
+            "规则：引用续聊，不引用新开。支持 AstrBot 4.28.0+（4.x）的飞书内置 Agent，按接口检查兼容性。\n"
             "恢复机器人回复所属话题需要飞书读取消息权限。"
         )
 

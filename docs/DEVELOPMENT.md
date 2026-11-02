@@ -2,17 +2,17 @@
 
 运行时复用 AstrBot 已安装的飞书 SDK 和 Python 标准库，无额外依赖。
 
-在仓库根目录运行本地检查：
+本机仅执行不运行插件的静态检查：
 
 ```sh
-python -B -m unittest discover -s tests -v
 ruff check .
 ruff format --check .
 ```
 
-在安装了 AstrBot 4.28.0 的隔离环境运行组件集成检查：
+单元及组件集成检查均在服务器 AstrBot 4.29.4 镜像的断网隔离容器执行，不启动第二个机器人实例：
 
 ```sh
+python -B -m unittest discover -s tests -v
 python -B tests/integration_offline.py
 ```
 
