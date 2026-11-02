@@ -1,4 +1,4 @@
-"""Run explicitly in an environment with AstrBot 4.28.0 installed.
+"""Run explicitly in an environment with AstrBot 4.29.4 installed.
 
 Uses real AstrBot/Lark classes and SQLite, denies outbound socket connects.
 Does not start an adapter, connect to Feishu, or invoke a model.
@@ -369,7 +369,7 @@ async def main():
         await asyncio.sleep(0)
         assert not plugin.locks
         print(
-            "PASS: real AstrBot 4.28.0 + Lark SDK + SQLite; new/resume/shared/restart/auto-title/card-interaction/native-send; no network"
+            "PASS: real AstrBot 4.29.4 + Lark SDK + SQLite; new/resume/shared/restart/auto-title/card-interaction/native-send; no network"
         )
     finally:
         await plugin.terminate()

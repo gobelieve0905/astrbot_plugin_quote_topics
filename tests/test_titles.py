@@ -69,6 +69,26 @@ class TitleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(messages[0]["content"], "原始产品问题")
         self.assertEqual({m["role"] for m in messages}, {"user", "assistant"})
 
+    async def test_invalid_primary_output_uses_backup(self):
+        self.plugin.config["auto_topic_title"] = True
+        backup = SimpleNamespace(
+            text_chat=AsyncMock(return_value=SimpleNamespace(completion_text="对助手表现的反馈"))
+        )
+        self.plugin.context.get_config = lambda **kw: {
+            "agent_runner": {
+                "runner_type": "local",
+                "config": {"model": {"fallback_provider_ids": ["backup"]}},
+            }
+        }
+        self.plugin.context.get_provider_by_id = lambda _: backup
+        for output in ("", "<None>", "标题\n解释", None):
+            self.conv.title = "引用话题 q1"
+            self.provider.text_chat.return_value.completion_text = output
+            await self.plugin.titles.generate(self.topic, "owner")
+            self.assertEqual(self.conv.title, "对助手表现的反馈")
+            self.assertEqual(self.conv.history, self.history)
+        self.assertEqual(backup.text_chat.await_count, 4)
+
     async def test_default_off(self):
         self.plugin.titles.schedule(self.topic, "owner")
         await self.drain()

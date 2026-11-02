@@ -18,7 +18,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     async def run_turn(self, event, before_save=None):
-        # A task per incoming message matches AstrBot 4.28.0 EventBus.
+        # A task per incoming message matches AstrBot 4.29.4 EventBus.
         async def pipeline():
             await self.plugin.interaction_entry(event)
             if event.stopped:
@@ -261,6 +261,26 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
                 await self.run_turn(event)
         self.assertTrue(event.stopped)
         self.assertFalse(self.plugin.locks)
+
+    async def test_newer_host_versions_keep_compatible_topic_routing(self):
+        for version in ("4.29.5", "4.30.0"):
+            with self.subTest(version=version), patch("astrbot.__version__", version):
+                event = Event(version)
+                req = await self.run_turn(event)
+                self.assertIsNotNone(req)
+                self.assertFalse(event.stopped)
+        self.assertEqual(len(self.manager.conversations), 2)
+
+    async def test_incompatible_host_api_stops_before_topic_changes(self):
+        for replacement in (None, lambda unexpected: None):
+            with self.subTest(replacement=replacement):
+                with patch.object(self.manager, "new_conversation", replacement):
+                    event = Event()
+                    await self.plugin.waiting(event)
+                self.assertTrue(event.stopped)
+                self.assertIn("new_conversation", event.sent[0])
+                self.assertFalse(self.manager.conversations)
+                self.assertFalse(self.plugin.locks)
 
     async def test_disabled_does_not_touch_selection_or_database(self):
         self.plugin.config["enabled"] = False
